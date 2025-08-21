@@ -1,216 +1,206 @@
 {
-  "openapi": "3.1.0",
+  "openapi": "3.0.3",
   "info": {
-    "title": "OpenAPI Plant Store",
-    "description": "A sample API that uses a plant store as an example to demonstrate features in the OpenAPI specification",
-    "license": {
-      "name": "MIT"
-    },
-    "version": "1.0.0"
+    "title": "Blutext API",
+    "version": "1.0.0",
+    "description": "OpenAPI specification documenting the public Blutext endpoint for storing text messages. All other endpoints are internal and are intentionally omitted."
   },
   "servers": [
     {
-      "url": "http://sandbox.mintlify.com"
+      "url": "https://api.blutext.com",
+      "description": "Blutext live API",
+      "variables": {
+        "apiId": { "default": "blutextapiid" },
+        "region": { "default": "us-east-1" },
+        "stage": { "default": "dev", "enum": ["dev", "staging", "production"] }
+      }
+    },
+    {
+      "url": "https://{domain}/",
+      "description": "Custom domain",
+      "variables": {
+        "domain": { "default": "api.blutext.com" }
+      }
     }
   ],
-  "security": [
-    {
-      "bearerAuth": []
-    }
+  "tags": [
+    { "name": "Text Messages", "description": "Send and schedule text messages" }
   ],
   "paths": {
-    "/plants": {
-      "get": {
-        "description": "Returns all plants from the system that the user has access to",
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "description": "The maximum number of results to return",
-            "schema": {
-              "type": "integer",
-              "format": "int32"
+    "/v1/text-messages": {
+      "post": {
+        "tags": ["Text Messages"],
+        "summary": "Store (send or schedule) a text message",
+        "description": "Creates a text message to be sent immediately or scheduled based on recipient's business hours and provided options.",
+        "operationId": "storeTextMessage",
+        "security": [ { "ApiKeyAuth": [] } ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StoreTextMessageRequest" },
+              "examples": {
+                "sendNow": {
+                  "summary": "Send immediately (if within business hours)",
+                  "value": { "to": "+14155550100", "message": "Hello from Blutext!", "check_dnc": true }
+                },
+                "scheduleManual": {
+                  "summary": "Schedule with manual approval",
+                  "value": { "to": "+14155550100", "message": "Follow-up tomorrow", "send_date": "2025-08-21T15:00:00Z", "manual_mode": true }
+                }
+              }
             }
           }
-        ],
+        },
         "responses": {
-          "200": {
-            "description": "Plant response",
+          "201": {
+            "description": "Message created successfully",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Plant"
+                "schema": { "$ref": "#/components/schemas/StoreTextMessageResponse" },
+                "examples": {
+                  "created": {
+                    "value": {
+                      "message_id": "5b5f0f0e-9e3a-4c3a-9a1e-2f2d6e1c1234",
+                      "status": "queued",
+                      "to_phone_number": "+1 415-555-0100",
+                      "to_phone_normalized": "+14155550100",
+                      "recipient_country": "US",
+                      "recipient_timezone": "GMT-7",
+                      "recipient_location": "San Francisco, United States",
+                      "recipient_local_time": "3:15 PM, Tuesday, Aug 20",
+                      "timezone_offset": -7,
+                      "is_dst": true,
+                      "scheduled_send_date": "2025-08-20T22:15:00.000Z",
+                      "within_business_hours": true,
+                      "can_send_now": true,
+                      "manual_mode": false,
+                      "available_to_group": false,
+                      "check_dnc": true,
+                      "business_hours": "9:00 AM - 7:00 PM local time",
+                      "message_length": 19,
+                      "max_retries": 3,
+                      "message": "Message queued for immediate sending"
+                    }
                   }
                 }
               }
             }
           },
           "400": {
-            "description": "Unexpected error",
+            "description": "Validation or bad request error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "invalidNumber": {
+                    "value": {
+                      "error": true,
+                      "message": "Validation failed",
+                      "statusCode": 400,
+                      "details": { "validationErrors": ["Invalid phone number format"] },
+                      "timestamp": "2025-08-20T16:06:00.000Z"
+                    }
+                  }
                 }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing or invalid API key)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (e.g., number on Do Not Call list)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed",
+            "headers": {
+              "Allow": { "schema": { "type": "string" }, "description": "Allowed methods" }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
               }
             }
           }
         }
       },
-      "post": {
-        "description": "Creates a new plant in the store",
-        "requestBody": {
-          "description": "Plant to add to the store",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NewPlant"
-              }
-            }
-          },
-          "required": true
-        },
+      "options": {
+        "summary": "CORS preflight",
         "responses": {
           "200": {
-            "description": "plant response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Plant"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/plants/{id}": {
-      "delete": {
-        "description": "Deletes a single plant based on the ID supplied",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "ID of plant to delete",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Plant deleted",
-            "content": {}
-          },
-          "400": {
-            "description": "unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  },
-  "webhooks": {
-    "/plant/webhook": {
-      "post": {
-        "description": "Information about a new plant added to the store",
-        "requestBody": {
-          "description": "Plant added to the store",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NewPlant"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Return a 200 status to indicate that the data was received successfully"
+            "description": "CORS preflight OK"
           }
         }
       }
     }
   },
   "components": {
-    "schemas": {
-      "Plant": {
-        "required": [
-          "name"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "description": "The name of the plant",
-            "type": "string"
-          },
-          "tag": {
-            "description": "Tag to specify the type",
-            "type": "string"
-          }
-        }
-      },
-      "NewPlant": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/Plant"
-          },
-          {
-            "required": [
-              "id"
-            ],
-            "type": "object",
-            "properties": {
-              "id": {
-                "description": "Identification number of the plant",
-                "type": "integer",
-                "format": "int64"
-              }
-            }
-          }
-        ]
-      },
-      "Error": {
-        "required": [
-          "error",
-          "message"
-        ],
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          }
-        }
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Api-Key",
+        "description": "Provide your Blutext API key. Authorization: Bearer <key> is also supported."
       }
     },
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer"
+    "schemas": {
+      "StoreTextMessageRequest": {
+        "type": "object",
+        "required": ["to", "message"],
+        "properties": {
+          "to": { "type": "string", "description": "Recipient phone number in E.164 format (e.g., +14155550100)" },
+          "message": { "type": "string", "description": "Text message body" },
+          "send_date": { "type": "string", "format": "date-time", "description": "Optional ISO 8601 datetime to schedule sending" },
+          "manual_mode": { "type": "boolean", "default": false, "description": "Require manual approval before sending" },
+          "available_to_group": { "type": "boolean", "default": false, "description": "Make message visible to the API key's group" },
+          "check_dnc": { "type": "boolean", "default": false, "description": "Check Do Not Call list before queueing" }
+        }
+      },
+      "StoreTextMessageResponse": {
+        "type": "object",
+        "properties": {
+          "message_id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["queued", "scheduled"] },
+          "to_phone_number": { "type": "string" },
+          "to_phone_normalized": { "type": "string" },
+          "recipient_country": { "type": "string" },
+          "recipient_timezone": { "type": "string" },
+          "recipient_location": { "type": "string" },
+          "recipient_local_time": { "type": "string" },
+          "timezone_offset": { "oneOf": [ {"type": "number"}, {"type": "array", "items": {"type": "number"}} ] },
+          "is_dst": { "type": "boolean" },
+          "scheduled_send_date": { "type": "string", "format": "date-time" },
+          "within_business_hours": { "type": "boolean" },
+          "can_send_now": { "type": "boolean" },
+          "manual_mode": { "type": "boolean" },
+          "available_to_group": { "type": "boolean" },
+          "check_dnc": { "type": "boolean" },
+          "business_hours": { "type": "string" },
+          "message_length": { "type": "integer" },
+          "max_retries": { "type": "integer" },
+          "message": { "type": "string", "description": "Human-readable status message added by the API" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "boolean" },
+          "message": { "type": "string" },
+          "statusCode": { "type": "integer" },
+          "details": { "type": "object" },
+          "timestamp": { "type": "string", "format": "date-time" }
+        }
       }
     }
   }
