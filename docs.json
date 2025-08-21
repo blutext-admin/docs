@@ -86,8 +86,8 @@
     }
   },
   "logo": {
-    "light": "/logo/blutext-light.svg",
-    "dark": "/logo/blutext-dark.svg"
+    "light": "/logo/blutext-light.png",
+    "dark": "/logo/blutext-dark.png"
   },
   "navbar": {
     "links": [
